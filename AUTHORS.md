@@ -1,6 +1,6 @@
 # Authors
 
-SVMem was created by Matt Sinclair in 2024.
+SVMem was created by Moeen Meigooni in 2024.
 
 
 All contributing authors are listed in this file below.
@@ -20,4 +20,6 @@ The rules for this file:
 -->
 
 **2024**
+- Moeen Meigooni <@moeenmeigooni>
 - Matt Sinclair <@msinclair-py>
+- Hyun Park <@hyunp2>

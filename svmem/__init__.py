@@ -1,6 +1,7 @@
 """
 SVMem
-A support vector machine approach to measuring Gaussian and mean membrane curvature, including in exotic systems including vesicular and tubular membranes.
+A support vector machine approach to measuring Gaussian and mean membrane 
+curvature, including in exotic systems like vesicular and tubular membranes.
 """
 
 # Add imports here

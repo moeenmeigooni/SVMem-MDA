@@ -56,60 +56,77 @@ class SVMem(AnalysisBase):
 
     def __init__(
         self,
-        universe_or_atomgroup: Union["Universe", "AtomGroup"],
-        select: str = "all",
-        # TODO: add your own parameters here
+        membrane: mda.AtomGroup,
+        method: str='numba', forcefield: str='martini',
+        periodic: List[bool]=[True, True, False], gamma: float=1.,
+        learning_rate: float=0.01, max_iter: int=500, 
+        tolerance: float=0.0001, train_labels: None=None
         **kwargs
     ):
-        # the below line must be kept to initialize the AnalysisBase class!
-        super().__init__(universe_or_atomgroup.trajectory, **kwargs)
-        # after this you will be able to access `self.results`
-        # `self.results` is a dictionary-like object
-        # that can should used to store and retrieve results
-        # See more at the MDAnalysis documentation:
-        # https://docs.mdanalysis.org/stable/documentation_pages/analysis/base.html?highlight=results#MDAnalysis.analysis.base.Results
+        super().__init__(membrane.universe.trajectory, **kwargs)
+        self.u = memb.universe
+        self.memb = memb
+        resids = ' '.join([str(x) for x in np.unique(self.memb.resids)])
 
-        self.universe = universe_or_atomgroup.universe
-        self.atomgroup = universe_or_atomgroup.select_atoms(select)
+        # Defined headgroup atom selections by forcefield
+        match forcefield.lower():
+            case 'martini':
+                head_sel = f'name GL0 PO4 and resid {resids}'
+            case 'charmm':
+                head_sel = f'name OG12 P and resid {resids}'
+            case _:
+                raise ValueError(f'{forcefield=} is not a valid forcefield! \
+                        Please specify either martini or charmm!')
+
+        self.train_points = self.u.select_atoms(head_sel)
+        self.n_train_points = self.train_points.n_atoms
+        self.n_frames = self.u.trajectory.n_frames
+
+        # Backend switch
+        match method.lower():
+            case 'jax':
+                raise NotImplementedError('Not yet implemented, coming soon(TM).')
+                from backends import SVMem_jax as backend
+            case 'numba':
+                from backends import SVMem_numba as backend
+            case 'numpy':
+                from backends import SVMem_numpy as backend
+            case _:
+                raise ValueError(f'{method=} is not a valid backend choice! \
+                        Please specify from jax, numba or python!')
+
+        atom_ids_per_lipid = [residue.atoms.indices for residue in memb.residues]
+        self.backend = backend.Backend(periodic, train_labels, gamma, learning_rate,
+                                       max_iter, tolerance, atom_ids_per_lipid)
 
     def _prepare(self):
         """Set things up before the analysis loop begins"""
-        # This is an optional method that runs before
-        # _single_frame loops over the trajectory.
-        # It is useful for setting up results arrays
-        # For example, below we create an array to store
-        # the number of atoms with negative coordinates
-        # in each frame.
-        self.results.is_negative = np.zeros(
-            (self.n_frames, self.atomgroup.n_atoms),
-            dtype=bool,
-        )
+        self.center_shift = np.mean(self.memb.positions, axis=0)
+        self.memb.positions -= self.center_shift
+        self.results.weights_list = []
+        self.results.intercept_list = []
+        self.results.support_indices_list = []
+        self.results.mean_curvature = np.empty((self.n_frames, self.n_train_points))
+        self.results.gaussian_curvature = np.empty_like(self.mean_curvature)
+        self.results.normal_vectors = np.empty((self.n_frames, self.n_train_points, 3))
 
     def _single_frame(self):
         """Calculate data from a single frame of trajectory"""
-        # This runs once for each frame of the trajectory
-        # It can contain the main analysis method, or just collect data
-        # so that analysis can be done over the aggregate data
-        # in _conclude.
+        fr = self._frame_index
 
-        # The trajectory positions update automatically
-        negative = self.atomgroup.positions < 0
-        # You can access the frame number using self._frame_index
-        self.results.is_negative[self._frame_index] = negative.any(axis=1)
+        mean, gaussian, normals, weights, intercept, support_indices = self.backend.calculate_curvature(
+                self.train_points.positions, 
+                self.u.dimensions[:3], 
+                self.memb
+                )
+
+        self.results.mean_curvature[fr] = mean
+        self.results.gaussian_curvature[fr] = gaussian
+        self.results.normal_vectors[fr] = normals
+        self.results.weights_list.append(weights)
+        self.results.intercept_list.append(intercept)
+        self.results.support_indices_list.append(support_indices)
 
     def _conclude(self):
         """Calculate the final results of the analysis"""
-        # This is an optional method that runs after
-        # _single_frame loops over the trajectory.
-        # It is useful for calculating the final results
-        # of the analysis.
-        # For example, below we determine the
-        # which atoms always have negative coordinates.
-        self.results.always_negative = self.results.is_negative.all(axis=0)
-        always_negative_atoms = self.atomgroup[self.results.always_negative]
-        self.results.always_negative_atoms = always_negative_atoms
-        self.results.always_negative_atom_names = always_negative_atoms.names
-
-        # results don't have to be arrays -- they can be any value, e.g. floats
-        self.results.n_negative_atoms = self.results.is_negative.sum(axis=1)
-        self.results.mean_negative_atoms = self.results.n_negative_atoms.mean()
+        self.memb.positions += self.center_shift
