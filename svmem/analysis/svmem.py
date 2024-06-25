@@ -7,8 +7,10 @@ This module contains the :class:`SVMem` class.
 """
 from typing import Union, TYPE_CHECKING
 
+import MDAnalysis as mda
 from MDAnalysis.analysis.base import AnalysisBase
 import numpy as np
+from typing import List
 
 if TYPE_CHECKING:
     from MDAnalysis.core.universe import Universe, AtomGroup
@@ -60,14 +62,15 @@ class SVMem(AnalysisBase):
         method: str='numba', forcefield: str='martini',
         periodic: List[bool]=[True, True, False], gamma: float=1.,
         learning_rate: float=0.01, max_iter: int=500, 
-        tolerance: float=0.0001, train_labels: None=None
+        tolerance: float=0.0001, train_labels: None=None,
         **kwargs
     ):
         super().__init__(membrane.universe.trajectory, **kwargs)
-        self.u = memb.universe
-        self.memb = memb
-        resids = ' '.join([str(x) for x in np.unique(self.memb.resids)])
+        self.u = membrane.universe
+        self.memb = membrane
+        resids = ' '.join([str(x) for x in np.unique(self.memb.residues.resids)])
 
+        print(self.memb.resids)
         # Defined headgroup atom selections by forcefield
         match forcefield.lower():
             case 'martini':
@@ -95,7 +98,7 @@ class SVMem(AnalysisBase):
                 raise ValueError(f'{method=} is not a valid backend choice! \
                         Please specify from jax, numba or python!')
 
-        atom_ids_per_lipid = [residue.atoms.indices for residue in memb.residues]
+        atom_ids_per_lipid = [residue.atoms.indices for residue in self.memb.residues]
         self.backend = backend.Backend(periodic, train_labels, gamma, learning_rate,
                                        max_iter, tolerance, atom_ids_per_lipid)
 
@@ -107,7 +110,7 @@ class SVMem(AnalysisBase):
         self.results.intercept_list = []
         self.results.support_indices_list = []
         self.results.mean_curvature = np.empty((self.n_frames, self.n_train_points))
-        self.results.gaussian_curvature = np.empty_like(self.mean_curvature)
+        self.results.gaussian_curvature = np.empty_like(self.results.mean_curvature)
         self.results.normal_vectors = np.empty((self.n_frames, self.n_train_points, 3))
 
     def _single_frame(self):

@@ -1,0 +1,55 @@
+Getting Started
+===============
+
+Python environment requirements:
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+MDAnalysis >= version
+numba >= 0.45.1
+scikit-learn >= 0.21.2
+jax >= version
+
+Basic usage:
+~~~~~~~~~~~~
+.. code-block:: python
+  :linenos:
+  import MDAnalysis as mda
+  import numpy as np
+  from svmem import svmem
+
+  # load structure into MDAnalysis Universe object
+  u = mda.Universe('membrane.pdb') 
+
+  # select membrane only
+  lipid = u.select_atoms('segid MEMB')
+
+  # define selection for training set
+  head_selection_text = 'name PO4' 
+  head_selection = u.select_atoms(head_selection_text)
+
+  # define periodicity of system in x,y,z directions
+  periodic = np.array([True, True, False]) 
+
+  # get indices of each lipid, required for COM calculation
+  atom_ids_per_lipid = [np.array([atom.index for atom in residue.atoms]) for residue in lipid.residues] 
+
+  # define gamma, hyperparameter used for RBF kernel 
+  gamma = 0.1 
+
+  svmem = SVMem(lipid.positions, # atomic coordinates of all lipids; shape = (n_frames, n_atoms)
+              head_selection, # indices of training points; shape = (n_lipids)
+              atom_ids_per_lipid, # list of atom ids for each lipid; shape = (n_lipids, 
+              lipid.unitcell_lengths, # unitcell dimensions; shape = (n_frames, 3)
+              periodic, 
+              gamma) 
+
+  svmem.calculate_curvature(frames='all')
+
+  # curvature and normal vectors are stored in the svmem object
+  svmem.mean_curvature
+  svmem.gaussian_curvature
+  svmem.normal_vectors
+
+Troubleshooting:
+~~~~~~~~~~~~~~~~
+Having problems running SVMem? Documentation will be limited until the release of version 0.1.
+Until then, email me at meigoon2@illinois.edu with questions/comments/concerns, and I'll get back to you as soon as I can.

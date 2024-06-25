@@ -6,13 +6,16 @@ requires = [
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "mda-svmem"
+name = "svmem"
 description = "A support vector machine approach to measuring Gaussian and mean membrane curvature, including in exotic systems including vesicular and tubular membranes."
 license = {file = "LICENSE" }
 authors = [
+	{name = "Moeen Meigooni", email = "moeen.meigooni@gmail.com"},
     {name = "Matt Sinclair", email = "msinclair01940@gmail.com"},
+	{name = "Hyun Park", email = "hyunp2@illinois.edu"}
 ]
 maintainers = [
+	{name = "Moeen Meigooni", email = "moee.meigooni@gmail.com"},
     {name = "Matt Sinclair", email = "msinclair01940@gmail.com"},
 ]
 readme = "README.md"

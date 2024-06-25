@@ -20,7 +20,7 @@ def vec_mag(vec):
     return np.linalg.norm(vec)
 
 def vec_mags(vecs):
-    return [np.linalg.norm(vec) for vec in vecs]
+    return np.array([np.linalg.norm(vec) for vec in vecs])
 
 def vec_norm(vec):
     return vec / vec_mag(vec)

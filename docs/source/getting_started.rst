@@ -1,54 +1,51 @@
 Getting Started
 ===============
 
-Python environment requirements:
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-MDAnalysis >= version
-numba >= 0.45.1
-scikit-learn >= 0.21.2
-jax >= version
+Python environment requirements
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* MDAnalysis >= version
+* numba >= 0.45.1
+* scikit-learn >= 0.21.2
+* jax >= version
 
-Basic usage:
-~~~~~~~~~~~~
-.. code-block:: Python
-    from SVMem import SVMem
-    import numpy as np
-    import mdtraj as md
+Basic usage
+~~~~~~~~~~~
+.. code-block:: python
+  :linenos:
 
-    # load structure into mdtraj trajectory object
-    trajectory = md.load('membrane.pdb') 
+  import MDAnalysis as mda
+  from svmem import svmem
 
-    # remove water, ions
-    lipid = trajectory.atom_slice(trajectory.top.select('not name W WF NA CL'))
+  # load structure into MDAnalysis Universe object
+  u = mda.Universe('membrane.pdb') 
 
-    # define selection for training set
-    head_selection_text = 'name PO4' 
-    head_selection = lipid.top.select(head_selection_text)
+  # select membrane only
+  lipid = u.select_atoms('segid MEMB')
 
-    # define periodicity of system in x,y,z directions
-    periodic = np.array([True, True, False]) 
+  # define various hyperparameters
+  periodic = np.array([True, True, False]) 
+  gamma = 0.01 
+  learning_rate = 0.1
+  max_iter = 500
+  tolerance = 0.0001
 
-    # get indices of each lipid, required for COM calculation
-    atom_ids_per_lipid = [np.array([atom.index for atom in residue.atoms]) for residue in lipid.top.residues] 
+  # instance svmem class
+  svmem = svmem(lipid,
+                periodic=periodic, 
+                gamma=gamma,
+                learning_rate=learning_rate,
+                max_iter=max_iter,
+                tolerance=tolerance) 
 
-    # define gamma, hyperparameter used for RBF kernel 
-    gamma = 0.1 
+  # run analysis
+  svmem.run()
 
-    svmem = SVMem(lipid.xyz, # atomic xyz coordinates of all lipids; shape = (n_frames, n_atoms)
-                head_selection, # indices of training points; shape = (n_lipids)
-                atom_ids_per_lipid, # list of atom ids for each lipid; shape = (n_lipids, 
-                lipid.unitcell_lengths, # unitcell dimensions; shape = (n_frames, 3)
-                periodic, 
-                gamma) 
+  # curvature and normal vectors are stored in the svmem object
+  svmem.results.mean_curvature
+  svmem.results.gaussian_curvature
+  svmem.results.normal_vectors
 
-    svmem.calculate_curvature(frames='all')
-
-    # curvature and normal vectors are stored in the svmem object
-    svmem.mean_curvature
-    svmem.gaussian_curvature
-    svmem.normal_vectors
-
-Troubleshooting:
-~~~~~~~~~~~~~~~~
+Troubleshooting
+~~~~~~~~~~~~~~~
 Having problems running SVMem? Documentation will be limited until the release of version 0.1.
 Until then, email me at meigoon2@illinois.edu with questions/comments/concerns, and I'll get back to you as soon as I can.
