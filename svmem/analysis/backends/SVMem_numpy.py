@@ -32,7 +32,8 @@ def vec_sum(vecs):
     return np.sum(vecs, axis=1)
 
 def unravel_index(n1, n2):
-    a, b = np.empty((n1, n2), dtype=np.int64), np.empty((n1, n2), dtype=np.int64)
+    a = np.empty((n1, n2), dtype=np.int64)
+    b = np.empty((n1, n2), dtype=np.int64)
     for i in range(n1):
         for j in range(n2):
             a[i,j], b[i,j] = i, j
@@ -49,7 +50,7 @@ def unravel_upper_triangle_index(n):
                 k += 1
     return a, b
 
-def sym_dist_mat_(xyzs, box_dims, periodic):
+def _sym_dist_mat(xyzs, box_dims, periodic):
     n = xyzs.shape[0]
     n_unique = (n * (n-1)) // 2
     ndim = xyzs.shape[1]
@@ -66,7 +67,7 @@ def sym_dist_mat_(xyzs, box_dims, periodic):
 
 def sym_dist_mat(xyzs, box_dims, periodic):
     n = xyzs.shape[0]
-    dist_mat_flat = sym_dist_mat_(xyzs, box_dims, periodic)
+    dist_mat_flat = _sym_dist_mat(xyzs, box_dims, periodic)
     dist_mat = np.zeros((n,n))
     k = 0
     for i in range(n):
@@ -86,7 +87,7 @@ def dist_mat_(xyz1, xyz2, box_dims, periodic):
     for k in range(n1 * n2):
         dr = np.abs(xyz1[i[k]] - xyz2[j[k]])
         for ri in range(ndim):
-            if periodic[ri] == True:
+            if periodic[ri]:
                 while (dr[ri] >  (box_dims[ri]*0.5)):
                     dr[ri] -= box_dims[ri]
             dist_mat[k] += np.square(dr[ri])
@@ -96,26 +97,6 @@ def dist_mat(xyz1, xyz2, box_dims, periodic):
     n1 = xyz1.shape[0]
     n2 = xyz2.shape[0]
     return dist_mat_(xyz1, xyz2, box_dims, periodic).reshape(n1, n2)
-
-def dist_mat_parallel_(xyz1, xyz2, box_dims, periodic):
-    n1 = xyz1.shape[0]
-    n2 = xyz2.shape[0]
-    ndim = xyz1.shape[1]
-    dist_mat = np.zeros((n1 * n2))
-    i, j = unravel_index(n1, n2)
-    for k in range(n1 * n2):
-        for ri in range(ndim):
-            dr = np.abs(xyz1[i[k],ri] - xyz2[j[k],ri])
-            if periodic[ri] == True:
-                if (dr >  (box_dims[ri]*0.5)):
-                    dr -= box_dims[ri]
-            dist_mat[k] += np.square(dr)
-    return np.sqrt(dist_mat)
-
-def dist_mat_parallel(xyz1, xyz2, box_dims, periodic):
-    n1 = xyz1.shape[0]
-    n2 = xyz2.shape[0]
-    return dist_mat_parallel_(xyz1, xyz2, box_dims, periodic).reshape(n1, n2)
 
 def dist_vec(xyz, xyzs, box_dims, periodic):
     n = len(xyzs)
@@ -158,13 +139,6 @@ def gaussian_transform_vec(array, gamma):
         g_array[i] = np.exp(-gamma * np.square(array[i]))
     return g_array
 
-def gaussian_transform_vec_parallel(array, gamma):
-    g_array = np.empty_like(array)
-    n = array.shape[0]
-    for i in range(n):
-        g_array[i] = np.exp(-gamma * np.square(array[i]))
-    return g_array
-
 def gaussian_transform_mat_(array, gamma):
     g_array = np.empty_like(array)
     n = array.shape[0]
@@ -182,20 +156,11 @@ def decision_function(vec, weights, intercept):
         decision += weights[i] * vec[i]
     return decision + intercept
 
-def decision_function_mat(mat, weights, intercept):
-    n = mat.shape[0]
-    decisions = np.zeros((n))
-    for i in range(n):
-        decisions[i] = decision_function(mat[i], weights, intercept)
-    return decisions
-
 def predict(vec, weights, intercept):
     return np.sign(decision_function(vec, weights, intercept))
 
-def predict_mat(vec, weights, intercept):
-    return np.sign(decision_function_mat(vec, weights, intercept))
-
 def pbc_center(xyzs, box_dims):
+    #NOTE: SHOULD BE DONE IN MDA!
     n = xyzs.shape[0]
     d = xyzs.shape[1]
     center = np.empty((d))
@@ -215,6 +180,7 @@ def pbc_center(xyzs, box_dims):
     return center
 
 def calculate_lipid_coms(lipids_xyz, atom_ids_per_lipid, box_dims):
+    #NOTE: SHOULD BE DONE IN MDA!
     n_lipids = len(atom_ids_per_lipid)
     coms = np.empty((n_lipids, 3))
     for i in range(n_lipids):
