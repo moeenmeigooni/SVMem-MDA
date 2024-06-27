@@ -209,14 +209,16 @@ def gradient(disps, gxdists, gamma, weights):
             del_F[j] += factor * weights[i] * disps[i,j] * gxdists[i]
     return del_F
 
-def gradient_descent(point_, support_points, box_dims, periodic, weights, intercept, gamma, learning_rate, max_iter):
+def gradient_descent(point_, support_points, box_dims, periodic, weights, 
+                     intercept, gamma, learning_rate, max_iter):
     point = point_.copy()
     disps = disp_vec(point, support_points, box_dims, periodic)
     gxdists = gaussian_transform_vec(vec_mags(disps), gamma)
     d = decision_function(gxdists, weights, intercept)
     sign = nsign_int(d)
-    step = -learning_rate * nsign(d) * vec_norm(gradient(disps, gxdists, gamma, weights))
-    for i in range(max_iter):
+    step = -learning_rate * nsign(d) * vec_norm(gradient(disps, gxdists, 
+                                                         gamma, weights))
+    for _ in range(max_iter):
         point += step
         disps = update_disps(disps, step, box_dims, periodic)
         gxdists = gaussian_transform_vec(vec_mags(disps), gamma)
@@ -225,10 +227,16 @@ def gradient_descent(point_, support_points, box_dims, periodic, weights, interc
         if newsign != sign:
             step *= -1.
             break
-        step = -learning_rate * nsign(d) * vec_norm(gradient(disps, gxdists, gamma, weights))
+        step = -learning_rate * nsign(d) * vec_norm(gradient(disps, 
+                                                             gxdists, 
+                                                             gamma, 
+                                                             weights))
+    else:
+        raise ValueError(f'Gradient descent has not converged after {max_iter} steps!')
     return point, vec_norm(step), disps
 
-def coordinate_descent(point_, step, disps, box_dims, periodic, weights, intercept, gamma, step_init, max_iter, tol):
+def coordinate_descent(point_, step, disps, box_dims, periodic, weights, 
+                       intercept, gamma, step_init, max_iter, tol):
     point = point_.copy()
     step = step_init * step
     gxdists = gaussian_transform_vec(vec_mags(disps), gamma)
@@ -247,7 +255,9 @@ def coordinate_descent(point_, step, disps, box_dims, periodic, weights, interce
         s = news
     return point
     
-def descend_to_boundary(points, support_points, box_dims, periodic, weights, intercept, gamma, learning_rate, max_iter, tol):
+def descend_to_boundary(points, support_points, box_dims, periodic, 
+                        weights, intercept, gamma, learning_rate, 
+                        max_iter, tol):
     n = points.shape[0]
     d = points.shape[1]
     bounds = np.empty((n, d))
@@ -263,7 +273,8 @@ def descend_to_boundary(points, support_points, box_dims, periodic, weights, int
             learning_rate, max_iter, tol)
     return bounds, -1.*normal_vectors
 
-def analytical_derivative(point, support_points, box_dims, periodic, gamma, weights):
+def analytical_derivative(point, support_points, box_dims, periodic, 
+                          gamma, weights):
     d = point.shape[0]
     n = support_points.shape[0]
     disps = disp_vec(point, support_points, box_dims, periodic)

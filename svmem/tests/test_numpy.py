@@ -32,6 +32,22 @@ def default_vectors():
     
     return v1, v2
 
+@pytest.fixture(scope='module')
+def default_grad_settings():
+    points = np.array([])
+    support_points = np.array([])
+    weights = np.array([])
+    intercept = np.array([])
+
+    return points, support_points, weights, intercept
+
+@pytest.fixture(scope='module')
+def default_curve_settings():
+    grad = np.array([])
+    hess = np.array([])
+    
+    return grad, hess
+
 @pytest.mark.parametrize(
     'structure,trajectory,forcefield', [
         ('martini_membrane.pdb',
@@ -68,7 +84,9 @@ def test_svmem(structure, trajectory, forcefield,
     )
     
     svm.run()
-    assert svm.return_status
+    assert svm.results.mean_curvature
+    assert svm.results.gaussian_curvature
+    assert svm.results.normal_vectors
     
 def test_ndot(default_vectors):
     a, b = default_vectors
@@ -76,10 +94,10 @@ def test_ndot(default_vectors):
     
 @pytest.mark.parametrize(
     'func,value,result', [
-        (nsign, 1, 1.),
-        (nsign, -1, -1.),
-        (nsign_int, 1., 1),
-        (nsign_int, -1., -1)
+        (snp.nsign, 1, 1.),
+        (snp.nsign, -1, -1.),
+        (snp.nsign_int, 1., 1),
+        (snp.nsign_int, -1., -1)
     ]
 )
 def test_nsign(func, value, result):
@@ -168,37 +186,108 @@ def test_gaussian_transform_mat(default_sim_settings):
     
     assert snp.gaussian_transform_mat(matrix, gamma) == result
 
-def test_predict():
-    vector = np.array([])
-    weights = np.array([])
-    intercept = np.array([])
-    result = 1
+def test_update_disps(default_sim_settings):
+    box_dims, periodic = default_sim_settings
+    disps = np.array([[-3., -3., -3.],
+                      [-6., -6., -6.],
+                      [-9., -9., -9.]])
+    step = np.array([1, 1, 1])
+    result = np.array([[-2., -2., -2.],
+                       [-5., -5., -5.],
+                       [4., 4., -8.]])
     
-    #assert snp.predict(vector, weights, intercept) == result
+    assert snp.update_disps(disps, step, box_dims, periodic) == result
 
-def test_update_disps():
-    pass
+def test_gradient(default_ml_settings,
+                  default_grad_settings):
+    gamma, _ = default_ml_settings
+    _, _, weights, _ = default_grad_settings
+    disps = np.array([[-3., -3., -3.],
+                      [-6., -6., -6.],
+                      [-9., -9., -9.]])
+    gxdists = snp.gaussian_transform_vec(snp.vec_mags(disps), gamma)
+    result = np.array([])
 
-def test_gradient():
-    pass
+    assert snp.gradient(disps, gxdists, gamma, weights) == result
+    
+def test_gradient_descent(default_ml_settings, 
+                          default_sim_settings,
+                          default_grad_settings):
+    gamma, learning_rate, max_iter, _ = default_ml_settings
+    box_dims, periodic = default_sim_settings
+    points, support_points, weights, intercept = default_grad_settings
+    result = np.array([])
+    
+    grad_descent = snp.gradient_descent(points[0], support_points, box_dims, 
+                                        periodic, weights, intercept, gamma, 
+                                        learning_rate, max_iter)
+    assert grad_descent == result
 
-def test_gradient_descent():
-    pass
+def test_coordinate_descent(default_ml_settings, 
+                            default_sim_settings,
+                            default_grad_settings):
+    gamma, _, max_iter, tol, _ = default_ml_settings
+    box_dims, periodic = default_sim_settings
+    points, _, weights, intercept = default_grad_settings
+    step = np.array([])
+    disps = np.array([])
+    step_init = 1.
+    result = np.array([])
+    
+    coord_descent = snp.coordinate_descent(points[0], step, disps, box_dims,
+                                           periodic, weights, intercept, gamma,
+                                           step_init, max_iter, tol)
 
-def test_coordinate_descent():
-    pass
+    assert coord_descent == result
+    
+def test_descend_to_boundary(default_ml_settings, 
+                             default_sim_settings,
+                             default_grad_settings):
+    gamma, learning_rate, max_iter, tol, _ = default_ml_settings
+    box_dims, periodic = default_sim_settings
+    points, support_points, weights, intercept = default_grad_settings
+    result = (np.array([]),
+              np.array([]))
+    
+    bounds, normals = snp.descend_to_boundary(points, support_points, box_dims, 
+                                              periodic, weights, intercept, 
+                                              gamma, learning_rate, max_iter, tol)
+    assert (bounds, normals) == result
 
-def test_descend_to_boundary():
-    pass
+def test_analytical_derivative(default_ml_settings, 
+                               default_sim_settings,
+                               default_grad_settings):
+    gamma, _ = default_ml_settings
+    box_dims, periodic = default_sim_settings
+    points, support_points, weights, _ = default_grad_settings
+    result = (np.array([]),
+              np.array([]))
+    
+    dx, hess = snp.analytical_derivative(points[0], support_points, box_dims,
+                                         periodic, gamma, weights)
+    assert (dx, hess) == result
 
-def test_analytical_derivative():
-    pass
+def test_gaussian_curvature(default_curve_settings):
+    grad, hess = default_curve_settings
+    result = 
+    
+    assert snp.gaussian_curvature(grad, hess) == result
 
-def test_gaussian_curvature():
-    pass
+def test_mean_curvature(default_curve_settings):
+    grad, hess = default_curve_settings
+    result = np.array([])
+    
+    assert snp.mean_curvature(grad, hess) == result
 
-def test_mean_curvature():
-    pass
-
-def test_curvatures():
-    pass
+def test_curvatures(default_ml_settings, 
+                    default_sim_settings,
+                    default_grad_settings):
+    gamma, _ = default_ml_settings
+    box_dims, periodic = default_sim_settings
+    points, support_points, weights, _ = default_grad_settings
+    result = (np.array([]),
+              np.array([]))
+    
+    gauss, mean = snp.curvatures(points, support_points, box_dims, periodic,
+                                 gamma, weights)
+    assert (gauss, mean) == result
